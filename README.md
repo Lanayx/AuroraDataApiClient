@@ -1,2 +1,2 @@
 # AuroraDataApiClient
-AWS.RDSDataService wrapper
+*AWS.RDSDataService* wrapper for .NET
