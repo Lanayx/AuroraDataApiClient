@@ -1,7 +1,56 @@
 ﻿namespace AuroraDataApiClient
 
+open System
 open Amazon.RDSDataService
 open Amazon.RDSDataService.Model
+
+[<AllowNullLiteral>]
+type SqlParameters() =
+    let allParameters = ResizeArray()    
+    member this.Add(name: string, value: int) =
+        SqlParameter(
+            Name = name,
+            Value = Field(LongValue = int64 value)
+        ) |> allParameters.Add
+        this
+    member this.Add(name: string, value: int64) =
+        SqlParameter(
+            Name = name,
+            Value = Field(LongValue = value)
+        ) |> allParameters.Add
+        this
+    member this.Add(name: string, value: byte) =
+        SqlParameter(
+            Name = name,
+            Value = Field(LongValue = int64 value)
+        ) |> allParameters.Add
+        this
+    member this.Add(name: string, value: string) =
+        SqlParameter(
+            Name = name,
+            Value = Field(StringValue = value)
+        ) |> allParameters.Add
+        this
+    member this.Add(name: string, value: single) =
+        SqlParameter(
+            Name = name,
+            Value = Field(DoubleValue = float value)
+        ) |> allParameters.Add
+        this
+    member this.Add(name: string, value: float) =
+        SqlParameter(
+            Name = name,
+            Value = Field(DoubleValue = value)
+        ) |> allParameters.Add
+        this
+    member this.Add(name: string, value: DateTime) =
+        SqlParameter(
+            Name = name,
+            Value = Field(StringValue = value.ToString("yyyy-MM-dd hh:mm:ss.fff")),
+            TypeHint = TypeHint.TIMESTAMP
+        ) |> allParameters.Add
+        this
+    member this.Value = allParameters
 
 type AuroraClientSettings = {
     RdsDataServiceClient: AmazonRDSDataServiceClient
@@ -22,7 +71,7 @@ type AuroraClientSettings = {
 type AuroraClient(settings: AuroraClientSettings) =
     do settings.Validate()
     
-    let createExecuteRequest sqlCommand parameters =
+    let createExecuteRequest sqlCommand (parameters: SqlParameters) =
         let request =
             ExecuteStatementRequest(
                 SecretArn = settings.SecretArn,
@@ -33,7 +82,8 @@ type AuroraClient(settings: AuroraClientSettings) =
                 Sql = sqlCommand
             )
         if parameters |> isNull |> not then
-            request.Parameters.AddRange parameters
+            parameters.Value
+            |> request.Parameters.AddRange
         request
         
     member this.ExecuteSql(sqlCommand, sqlParameters) =

@@ -2,6 +2,12 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "AuroraDataApiClient", "src\AuroraDataApiClient.fsproj", "{525DD5EE-DF6B-44A0-8093-667E272CAD21}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{0556F098-A51A-4F3E-8FF8-C859DFF43AD4}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{D6633542-578A-435C-B41B-DC803066D27B}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "UnitTests", "test\UnitTests\UnitTests.fsproj", "{4DCD0AAA-6F00-40ED-8CAA-6C876CF602B8}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +18,13 @@ Global
 		{525DD5EE-DF6B-44A0-8093-667E272CAD21}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{525DD5EE-DF6B-44A0-8093-667E272CAD21}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{525DD5EE-DF6B-44A0-8093-667E272CAD21}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4DCD0AAA-6F00-40ED-8CAA-6C876CF602B8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4DCD0AAA-6F00-40ED-8CAA-6C876CF602B8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4DCD0AAA-6F00-40ED-8CAA-6C876CF602B8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4DCD0AAA-6F00-40ED-8CAA-6C876CF602B8}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{525DD5EE-DF6B-44A0-8093-667E272CAD21} = {0556F098-A51A-4F3E-8FF8-C859DFF43AD4}
+		{4DCD0AAA-6F00-40ED-8CAA-6C876CF602B8} = {D6633542-578A-435C-B41B-DC803066D27B}
 	EndGlobalSection
 EndGlobal
