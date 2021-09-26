@@ -7,11 +7,13 @@
 
   <ItemGroup>
     <Compile Include="AuroraClient.fs" />
+    <Compile Include="AssemblyInfo.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Update="FSharp.Core" Version="6.0.0" />
     <PackageReference Include="AWSSDK.RDSDataService" Version="3.7.0.71" />
+    <PackageReference Include="System.Text.Json" Version="5.0.2" />
   </ItemGroup>
 
 </Project>
