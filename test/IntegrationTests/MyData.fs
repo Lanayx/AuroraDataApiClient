@@ -5,4 +5,5 @@ let serverArn = ""
 let databaseName = ""
 let iamAccessKey = ""
 let iamSecretKey = ""
+let region = RegionEndpoint.USEast1
 

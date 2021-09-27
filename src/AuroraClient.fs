@@ -22,7 +22,7 @@ type SqlParameters() =
             Value = Field(LongValue = value)
         ) |> allParameters.Add
         this
-    member this.Add(name: string, value: byte) =
+    member this.Add(name: string, value: int16) =
         SqlParameter(
             Name = name,
             Value = Field(LongValue = int64 value)
@@ -44,6 +44,12 @@ type SqlParameters() =
         SqlParameter(
             Name = name,
             Value = Field(DoubleValue = value)
+        ) |> allParameters.Add
+        this
+    member this.Add(name: string, value: bool) =
+        SqlParameter(
+            Name = name,
+            Value = Field(BooleanValue = value)
         ) |> allParameters.Add
         this
     member this.Add(name: string, value: DateTime) =
