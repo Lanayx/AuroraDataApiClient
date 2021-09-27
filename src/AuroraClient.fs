@@ -2,13 +2,14 @@
 
 open System
 open System.Globalization
+open System.Reflection
 open System.Text.Json
 open Amazon.RDSDataService
 open Amazon.RDSDataService.Model
 
 [<AllowNullLiteral>]
 type SqlParameters() =
-    let allParameters = ResizeArray()    
+    let allParameters = ResizeArray()
     member this.Add(name: string, value: int) =
         SqlParameter(
             Name = name,
@@ -110,26 +111,50 @@ module internal TransformHelpers =
             |> request.Parameters.AddRange
         request
         
-    let getValue (col: ColumnMetadata) field =
-        //TODO
-        0
+    let setValue (col: ColumnMetadata) (field: Field) (propertyInfo: PropertyInfo) =
+        match col.TypeName with
+//        | "int2" ->
+//            propertyInfo.SetValue(col.Name, int8 field.LongValue)
+//        | "int8" ->
+//            propertyInfo.SetValue(col.Name, int8 field.LongValue)
+//        | "int16" ->
+//            propertyInfo.SetValue(col.Name, int16 field.LongValue)
+//        | "int32" ->
+//            propertyInfo.SetValue(col.Name, int32 field.LongValue)            
+//        | "int64" ->
+//            propertyInfo.SetValue(col.Name, field.LongValue)
+//        | "boolean" ->
+//            propertyInfo.SetValue(col.Name, field.BooleanValue)
+//        | "float" ->
+//            propertyInfo.SetValue(col.Name, single field.DoubleValue)
+//        | "double" ->
+//            propertyInfo.SetValue(col.Name, field.DoubleValue)
+        | "timestamp" ->
+            propertyInfo.SetValue(col.Name,  DateTime.Parse field.StringValue) |> Ok
+        | _ ->
+            Error <| $"Unknown type {col.TypeName} for {col.Name}"
         
         
     let parse (data: (ColumnMetadata*Field) seq): 'T =
         let t = typeof<'T>
         let o = Activator.CreateInstance<'T>()
+        let errors = ResizeArray()
         for col, field in data do
-            let value = getValue col field
-            t.GetProperty(col.Name).SetValue(o, value)
+            let property = t.GetProperty col.Name
+            match setValue col field property with
+            | Ok _ -> ()
+            | Error err -> errors.Add err
+        if errors.Count > 0 then
+            failwith <| String.Join(Environment.NewLine, errors)
         o
         
-    let transformRecords (data: ExecuteStatementResponse) =                  
+    let transformRecords (data: ExecuteStatementResponse) =
         data.Records
         |> Seq.map (fun record ->
             record
             |> Seq.zip data.ColumnMetadata
-            |> parse               
-            )
+            |> parse
+        )
 
 
 type AuroraClient (settings: AuroraClientSettings) =
@@ -183,8 +208,19 @@ type AuroraClient (settings: AuroraClientSettings) =
             task {
                 let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
                 return
-                    if data.Records.Count > 0 then
+                    if data.Records.Count = 0 then
                         Seq.empty
                     else
                         transformRecords data
+            }
+            
+        member this.GetRow(sqlCommand, sqlParameters) =
+            let request = createExecuteRequest settings sqlCommand sqlParameters true
+            task {
+                let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
+                return
+                    if data.Records.Count = 0 then
+                        ValueNone
+                    else
+                        transformRecords data |> Seq.head |> ValueSome
             }
