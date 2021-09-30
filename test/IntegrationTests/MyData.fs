@@ -1,4 +1,5 @@
 ﻿module IntegrationTests.MyData
+open Amazon
 
 let secretArn = ""
 let serverArn = ""
