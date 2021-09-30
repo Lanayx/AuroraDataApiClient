@@ -2,7 +2,6 @@
 
 open System
 open System.Globalization
-open System.Reflection
 open System.Text.Json
 open Amazon.RDSDataService
 open Amazon.RDSDataService.Model
@@ -83,19 +82,24 @@ type SqlParameters() =
 
     member this.Value = allParameters
 
+type EngineType =
+    | PostgreSql = 0
+    | MySql = 1
+
 type AuroraClientSettings = {
     RdsDataServiceClient: AmazonRDSDataServiceClient
     SecretArn: string
-    AuroraServerArn: string
+    AuroraArn: string
     DatabaseName: string
+    EngineType: EngineType
 } with
     member this.Validate() =
         if isNull this.RdsDataServiceClient then
             invalidArg (nameof(this.RdsDataServiceClient)) "Value can't be null"
         if isNull this.SecretArn then
             invalidArg (nameof(this.SecretArn)) "Value can't be null"
-        if isNull this.AuroraServerArn then
-            invalidArg (nameof(this.AuroraServerArn)) "Value can't be null"
+        if isNull this.AuroraArn then
+            invalidArg (nameof(this.AuroraArn)) "Value can't be null"
         if isNull this.DatabaseName then
             invalidArg (nameof(this.DatabaseName)) "Value can't be null"
 
@@ -106,7 +110,7 @@ module internal TransformHelpers =
         let request =
             ExecuteStatementRequest(
                 SecretArn = settings.SecretArn,
-                ResourceArn = settings.AuroraServerArn,
+                ResourceArn = settings.AuroraArn,
                 IncludeResultMetadata = returnsData,
                 ContinueAfterTimeout = true,
                 Database = settings.DatabaseName,
@@ -117,7 +121,7 @@ module internal TransformHelpers =
             |> request.Parameters.AddRange
         request
         
-    let getValue (col: ColumnMetadata) (field: Field) =
+    let getPostgreSqlValue (col: ColumnMetadata) (field: Field) =
         match col.TypeName with
         | "text" | "varchar" ->
             field.StringValue |> box |> Ok
@@ -142,14 +146,45 @@ module internal TransformHelpers =
         | _ ->
             Error <| $"Unknown type {col.TypeName} for {col.Name}"
         
+    let getMySqlValue (col: ColumnMetadata) (field: Field) =
+        match col.TypeName with
+        | "text" | "varchar" ->
+            field.StringValue |> box |> Ok
+        | "bool" ->
+            field.BooleanValue |> box |> Ok
+        | "uuid" ->
+            field.StringValue |> Guid.Parse |> box |> Ok
+        | "smallserial" | "int2" ->
+            field.LongValue |> int16 |> box |> Ok
+        | "serial" | "int4" ->
+            field.LongValue |> int32 |> box |> Ok
+        | "bigserial" | "int8" ->
+            field.LongValue |> box |> Ok
+        | "numeric" ->
+            field.StringValue |> Decimal.Parse |> box |> Ok
+        | "float4" ->
+            field.DoubleValue |> single |> box |> Ok
+        | "float8" ->
+            field.DoubleValue |> box |> Ok
+        | "timestamp" ->
+            field.StringValue |> DateTime.Parse |> box |> Ok
+        | _ ->
+            Error <| $"Unknown type {col.TypeName} for {col.Name}"
+      
+    let getValue engineType col field =
+        match engineType with
+        | EngineType.PostgreSql -> getPostgreSqlValue col field
+        | EngineType.MySql -> getMySqlValue col field
+        | _ -> failwith "Unknown engine type"
         
-    let parse (data: (ColumnMetadata*Field) seq): 'T =
+        
+    let parse engineType (data: (ColumnMetadata*Field) seq): 'T =
         let t = typeof<'T>
         let o = Activator.CreateInstance<'T>()
         let errors = ResizeArray()
         for col, field in data do
             let property = t.GetProperty col.Name
-            match getValue col field with
+            match getValue engineType col field with
             | Ok value ->
                 property.SetValue(o, value)
             | Error err ->
@@ -158,12 +193,12 @@ module internal TransformHelpers =
             failwith <| String.Join(Environment.NewLine, errors)
         o
         
-    let transformRecords (data: ExecuteStatementResponse) =
+    let transformRecords engineType (data: ExecuteStatementResponse) =
         data.Records
         |> Seq.map (fun record ->
             record
             |> Seq.zip data.ColumnMetadata
-            |> parse
+            |> parse engineType
         )
 
 
@@ -186,7 +221,7 @@ type AuroraClient (settings: AuroraClientSettings) =
             let field = data.Records.[0].[0]
             let column = data.ColumnMetadata.[0]
             return
-                match getValue column field with
+                match getValue settings.EngineType column field with
                 | Ok value ->
                     value :?> 'T
                 | Error err ->
@@ -197,7 +232,7 @@ type AuroraClient (settings: AuroraClientSettings) =
         let request =
             BeginTransactionRequest (
                 SecretArn = settings.SecretArn,
-                ResourceArn = settings.AuroraServerArn,
+                ResourceArn = settings.AuroraArn,
                 Database = settings.DatabaseName
             )
         task {            
@@ -209,7 +244,7 @@ type AuroraClient (settings: AuroraClientSettings) =
             let request =
                 CommitTransactionRequest (
                     SecretArn = settings.SecretArn,
-                    ResourceArn = settings.AuroraServerArn,
+                    ResourceArn = settings.AuroraArn,
                     TransactionId = transactionId
                 )
             task {                
@@ -221,7 +256,7 @@ type AuroraClient (settings: AuroraClientSettings) =
             let request =
                 RollbackTransactionRequest (
                     SecretArn = settings.SecretArn,
-                    ResourceArn = settings.AuroraServerArn,
+                    ResourceArn = settings.AuroraArn,
                     TransactionId = transactionId
                 )
             task {                
@@ -237,7 +272,7 @@ type AuroraClient (settings: AuroraClientSettings) =
                     if data.Records.Count = 0 then
                         Seq.empty
                     else
-                        transformRecords data
+                        transformRecords settings.EngineType data
             }
             
         member this.QueryFirst(sqlCommand, sqlParameters) =
@@ -248,5 +283,5 @@ type AuroraClient (settings: AuroraClientSettings) =
                     if data.Records.Count = 0 then
                         ValueNone
                     else
-                        transformRecords data |> Seq.head |> ValueSome
+                        transformRecords settings.EngineType data |> Seq.head |> ValueSome
             }
