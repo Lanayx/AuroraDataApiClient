@@ -117,26 +117,28 @@ module internal TransformHelpers =
             |> request.Parameters.AddRange
         request
         
-    let setValue (col: ColumnMetadata) (field: Field) (propertyInfo: PropertyInfo) =
+    let getValue (col: ColumnMetadata) (field: Field) =
         match col.TypeName with
-//        | "int2" ->
-//            propertyInfo.SetValue(col.Name, int8 field.LongValue)
-//        | "int8" ->
-//            propertyInfo.SetValue(col.Name, int8 field.LongValue)
-//        | "int16" ->
-//            propertyInfo.SetValue(col.Name, int16 field.LongValue)
-//        | "int32" ->
-//            propertyInfo.SetValue(col.Name, int32 field.LongValue)            
-//        | "int64" ->
-//            propertyInfo.SetValue(col.Name, field.LongValue)
-//        | "boolean" ->
-//            propertyInfo.SetValue(col.Name, field.BooleanValue)
-//        | "float" ->
-//            propertyInfo.SetValue(col.Name, single field.DoubleValue)
-//        | "double" ->
-//            propertyInfo.SetValue(col.Name, field.DoubleValue)
+        | "text" | "varchar" ->
+            field.StringValue |> box |> Ok
+        | "bool" ->
+            field.BooleanValue |> box |> Ok
+        | "uuid" ->
+            field.StringValue |> Guid.Parse |> box |> Ok
+        | "smallserial" | "int2" ->
+            field.LongValue |> int16 |> box |> Ok
+        | "serial" | "int4" ->
+            field.LongValue |> int32 |> box |> Ok
+        | "bigserial" | "int8" ->
+            field.LongValue |> box |> Ok
+        | "numeric" ->
+            field.StringValue |> Decimal.Parse |> box |> Ok
+        | "float4" ->
+            field.DoubleValue |> single |> box |> Ok
+        | "float8" ->
+            field.DoubleValue |> box |> Ok
         | "timestamp" ->
-            propertyInfo.SetValue(col.Name,  DateTime.Parse field.StringValue) |> Ok
+            field.StringValue |> DateTime.Parse |> box |> Ok
         | _ ->
             Error <| $"Unknown type {col.TypeName} for {col.Name}"
         
@@ -147,9 +149,11 @@ module internal TransformHelpers =
         let errors = ResizeArray()
         for col, field in data do
             let property = t.GetProperty col.Name
-            match setValue col field property with
-            | Ok _ -> ()
-            | Error err -> errors.Add err
+            match getValue col field with
+            | Ok value ->
+                property.SetValue(o, value)
+            | Error err ->
+                errors.Add err
         if errors.Count > 0 then
             failwith <| String.Join(Environment.NewLine, errors)
         o
@@ -166,11 +170,27 @@ module internal TransformHelpers =
 type AuroraClient (settings: AuroraClientSettings) =
     do settings.Validate()
         
-    member this.ExecuteSql (sqlCommand, sqlParameters) =
+    /// Executes query and returns number of records updated
+    member this.Execute (sqlCommand, sqlParameters) =
         let request = createExecuteRequest settings sqlCommand sqlParameters false
         task {
             let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
             return data.NumberOfRecordsUpdated
+        }
+        
+    /// Executes the query, and returns the first column of the first row in the result set
+    member this.ExecuteScalar<'T> (sqlCommand, sqlParameters) =
+        let request = createExecuteRequest settings sqlCommand sqlParameters true
+        task {
+            let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
+            let field = data.Records.[0].[0]
+            let column = data.ColumnMetadata.[0]
+            return
+                match getValue column field with
+                | Ok value ->
+                    value :?> 'T
+                | Error err ->
+                    failwith err
         }
         
     member this.BeginTransaction () =
@@ -209,7 +229,7 @@ type AuroraClient (settings: AuroraClientSettings) =
                 return response.TransactionStatus
             }
 
-        member this.GetRows(sqlCommand, sqlParameters) =
+        member this.Query(sqlCommand, sqlParameters) =
             let request = createExecuteRequest settings sqlCommand sqlParameters true
             task {
                 let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
@@ -220,7 +240,7 @@ type AuroraClient (settings: AuroraClientSettings) =
                         transformRecords data
             }
             
-        member this.GetRow(sqlCommand, sqlParameters) =
+        member this.QueryFirst(sqlCommand, sqlParameters) =
             let request = createExecuteRequest settings sqlCommand sqlParameters true
             task {
                 let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request

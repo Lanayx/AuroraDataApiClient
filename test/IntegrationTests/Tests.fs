@@ -12,16 +12,28 @@ let getClient rdsClient =
         AuroraServerArn = MyData.serverArn
         DatabaseName = MyData.databaseName
     })
+    
+[<CLIMutable>]
+type TestRecord = {
+    SerialField: int
+    TimeStampField: DateTime
+    TextField: string
+    VarCharField: string
+    BooleanField: bool
+    UuidField: Guid
+    SmallintField: int16
+    IntegerField: int32
+    BigintField: int64
+    NumericField: decimal
+    DecimalField: decimal
+    DoubleField: float
+    RealField: single
+    NullIntField: Nullable<int>
+}
 
 [<Fact>]
 let ``Full postgresql test`` () =
-    use rdsClient =
-        new AmazonRDSDataServiceClient(
-            MyData.iamAccessKey,
-            MyData.iamSecretKey,
-            MyData.region
-        )
-    let client = getClient rdsClient
+
     let sql =
         """
         INSERT INTO test (
@@ -54,6 +66,7 @@ let ``Full postgresql test`` () =
             :doubleField,
             :nullIntField
         )
+        RETURNING "SerialField"
         """
     let parameters =
         SqlParameters()
@@ -70,5 +83,29 @@ let ``Full postgresql test`` () =
             .Add("realField", 100.00f)
             .Add("doubleField", 100.00)
             .Add("nullIntField", 123)
+    let selectSql =
+        """
+        SELECT * FROM test
+        WHERE "SerialField" = :serialField 
+        """
+    task {
+        use rdsClient =
+            new AmazonRDSDataServiceClient(
+                MyData.iamAccessKey,
+                MyData.iamSecretKey,
+                MyData.region
+            )
+        let client = getClient rdsClient
+        let! newId = client.ExecuteScalar<int>(sql, parameters)
+        let selectParameters =
+            SqlParameters()
+                .Add("serialField", newId)
+        let! newRecord = client.QueryFirst<TestRecord>(selectSql, selectParameters)
+        match newRecord with
+        | ValueSome r ->
+            ()
+        | ValueNone ->
+            failwith "Record should not be null"
+                    
+    }
     
-    client.ExecuteSql(sql, parameters).Wait()
