@@ -2,7 +2,10 @@
 
 open System
 open System.Globalization
+open System.IO
+open System.Reflection
 open System.Text.Json
+open System.Threading.Tasks
 open Amazon.RDSDataService
 open Amazon.RDSDataService.Model
 
@@ -19,6 +22,12 @@ type SqlParameters() =
         SqlParameter(
             Name = name,
             Value = Field(LongValue = value)
+        ) |> allParameters.Add
+        this
+    member this.Add(name: string, value: int8) =
+        SqlParameter(
+            Name = name,
+            Value = Field(LongValue = int64 value)
         ) |> allParameters.Add
         this
     member this.Add(name: string, value: int16) =
@@ -72,6 +81,12 @@ type SqlParameters() =
             TypeHint = TypeHint.UUID
         ) |> allParameters.Add
         this
+    member this.Add(name: string, value: MemoryStream) =
+        SqlParameter(
+            Name = name,
+            Value = Field(BlobValue = value)
+        ) |> allParameters.Add
+        this
     member this.AddJson<'T>(name: string, value: 'T) =
         SqlParameter(
             Name = name,
@@ -106,6 +121,11 @@ type AuroraClientSettings = {
 
 [<AutoOpen>]
 module internal TransformHelpers =
+
+    let isSetBoolean = lazy typeof<Field>.GetMethod("IsSetBooleanValue", BindingFlags.Instance ||| BindingFlags.NonPublic)
+    let isSetLong = lazy typeof<Field>.GetMethod("IsSetLongValue", BindingFlags.Instance ||| BindingFlags.NonPublic)
+    let isSetDouble = lazy typeof<Field>.GetMethod("IsSetDoubleValue", BindingFlags.Instance ||| BindingFlags.NonPublic)
+    
     let createExecuteRequest (settings: AuroraClientSettings) sqlCommand (parameters: SqlParameters) returnsData =
         let request =
             ExecuteStatementRequest(
@@ -143,31 +163,37 @@ module internal TransformHelpers =
             field.DoubleValue |> box |> Ok
         | "timestamp" ->
             field.StringValue |> DateTime.Parse |> box |> Ok
+        | "bytea" ->
+            field.BlobValue |> box |> Ok
         | _ ->
             Error <| $"Unknown type {col.TypeName} for {col.Name}"
         
     let getMySqlValue (col: ColumnMetadata) (field: Field) =
         match col.TypeName with
-        | "text" | "varchar" ->
+        | "TEXT" | "VARCHAR" ->
             field.StringValue |> box |> Ok
-        | "bool" ->
+        | "BIT" ->
             field.BooleanValue |> box |> Ok
-        | "uuid" ->
-            field.StringValue |> Guid.Parse |> box |> Ok
-        | "smallserial" | "int2" ->
+        | "TINYINT" ->
+            field.LongValue |> int8 |> box |> Ok
+        | "SMALLINT" ->
             field.LongValue |> int16 |> box |> Ok
-        | "serial" | "int4" ->
+        | "INT" ->
             field.LongValue |> int32 |> box |> Ok
-        | "bigserial" | "int8" ->
+        | "BIGINT" ->
             field.LongValue |> box |> Ok
-        | "numeric" ->
+        | "BIGINT UNSIGNED" ->
+            field.LongValue |> uint64 |> box |> Ok
+        | "DECIMAL" ->
             field.StringValue |> Decimal.Parse |> box |> Ok
-        | "float4" ->
+        | "FLOAT" ->
             field.DoubleValue |> single |> box |> Ok
-        | "float8" ->
+        | "DOUBLE" ->
             field.DoubleValue |> box |> Ok
-        | "timestamp" ->
+        | "TIMESTAMP" | "DATETIME" ->
             field.StringValue |> DateTime.Parse |> box |> Ok
+        | "BLOB" ->
+            field.BlobValue |> box |> Ok
         | _ ->
             Error <| $"Unknown type {col.TypeName} for {col.Name}"
       
@@ -200,6 +226,43 @@ module internal TransformHelpers =
             |> Seq.zip data.ColumnMetadata
             |> parse engineType
         )
+        
+    let parseScalarData<'T> engineType (data: ExecuteStatementResponse) =
+        match engineType with
+        | EngineType.PostgreSql ->
+            let field =
+               if data.Records.Count > 0 then
+                   data.Records.[0].[0]
+               else
+                   failwith "Returned data is empty"
+            let column = data.ColumnMetadata.[0]
+            match getValue engineType column field with
+            | Ok value ->
+                value :?> 'T
+            | Error err ->
+                failwith err
+        | EngineType.MySql ->
+            let field =
+                if data.GeneratedFields.Count > 0 then
+                    data.GeneratedFields.[0]
+                else
+                   failwith "There are no generated fields found"
+            if field.StringValue |> isNull |> not then
+                field.StringValue |> box :?> 'T
+            elif field.ArrayValue |> isNull |> not then
+                field.ArrayValue |> box :?> 'T
+            elif field.BlobValue |> isNull |> not then
+                field.BlobValue |> box :?> 'T
+            elif isSetLong.Value.Invoke(field, null) :?> bool then
+                field.LongValue |> box :?> 'T
+            elif isSetBoolean.Value.Invoke(field, null) :?> bool then
+                field.BooleanValue |> box :?> 'T
+            elif isSetDouble.Value.Invoke(field, null) :?> bool then
+                field.DoubleValue |> box :?> 'T
+            else
+                failwith "There are no generated fields found"
+        | _ ->
+            failwith "Unknown engine type"
 
 
 type AuroraClient (settings: AuroraClientSettings) =
@@ -214,18 +277,33 @@ type AuroraClient (settings: AuroraClientSettings) =
         }
         
     /// Executes the query, and returns the first column of the first row in the result set
-    member this.ExecuteScalar<'T> (sqlCommand, sqlParameters) =
+    member this.ExecuteScalar<'T> (sqlCommand, sqlParameters): Task<'T> =
         let request = createExecuteRequest settings sqlCommand sqlParameters true
         task {
             let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
-            let field = data.Records.[0].[0]
-            let column = data.ColumnMetadata.[0]
+            return parseScalarData settings.EngineType data
+        }        
+    
+    member this.Query(sqlCommand, sqlParameters) =
+        let request = createExecuteRequest settings sqlCommand sqlParameters true
+        task {
+            let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
             return
-                match getValue settings.EngineType column field with
-                | Ok value ->
-                    value :?> 'T
-                | Error err ->
-                    failwith err
+                if data.Records.Count = 0 then
+                    Seq.empty
+                else
+                    transformRecords settings.EngineType data
+        }
+        
+    member this.QueryFirst(sqlCommand, sqlParameters) =
+        let request = createExecuteRequest settings sqlCommand sqlParameters true
+        task {
+            let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
+            return
+                if data.Records.Count = 0 then
+                    ValueNone
+                else
+                    transformRecords settings.EngineType data |> Seq.head |> ValueSome
         }
         
     member this.BeginTransaction () =
@@ -240,48 +318,26 @@ type AuroraClient (settings: AuroraClientSettings) =
             return response.TransactionId
         }
         
-        member this.CommitTransaction transactionId =
-            let request =
-                CommitTransactionRequest (
-                    SecretArn = settings.SecretArn,
-                    ResourceArn = settings.AuroraArn,
-                    TransactionId = transactionId
-                )
-            task {                
-                let! response = settings.RdsDataServiceClient.CommitTransactionAsync request
-                return response.TransactionStatus
-            }
+    member this.CommitTransaction transactionId =
+        let request =
+            CommitTransactionRequest (
+                SecretArn = settings.SecretArn,
+                ResourceArn = settings.AuroraArn,
+                TransactionId = transactionId
+            )
+        task {                
+            let! response = settings.RdsDataServiceClient.CommitTransactionAsync request
+            return response.TransactionStatus
+        }
             
-        member this.RollbackTransaction transactionId =
-            let request =
-                RollbackTransactionRequest (
-                    SecretArn = settings.SecretArn,
-                    ResourceArn = settings.AuroraArn,
-                    TransactionId = transactionId
-                )
-            task {                
-                let! response = settings.RdsDataServiceClient.RollbackTransactionAsync request
-                return response.TransactionStatus
-            }
-
-        member this.Query(sqlCommand, sqlParameters) =
-            let request = createExecuteRequest settings sqlCommand sqlParameters true
-            task {
-                let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
-                return
-                    if data.Records.Count = 0 then
-                        Seq.empty
-                    else
-                        transformRecords settings.EngineType data
-            }
-            
-        member this.QueryFirst(sqlCommand, sqlParameters) =
-            let request = createExecuteRequest settings sqlCommand sqlParameters true
-            task {
-                let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
-                return
-                    if data.Records.Count = 0 then
-                        ValueNone
-                    else
-                        transformRecords settings.EngineType data |> Seq.head |> ValueSome
-            }
+    member this.RollbackTransaction transactionId =
+        let request =
+            RollbackTransactionRequest (
+                SecretArn = settings.SecretArn,
+                ResourceArn = settings.AuroraArn,
+                TransactionId = transactionId
+            )
+        task {                
+            let! response = settings.RdsDataServiceClient.RollbackTransactionAsync request
+            return response.TransactionStatus
+        }

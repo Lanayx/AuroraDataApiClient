@@ -1,20 +1,22 @@
 module IntegrationTests.Tests
 
 open System
+open System.IO
 open Amazon.RDSDataService
 open AuroraDataApiClient
 open Xunit
 
-let getClient rdsClient =
+let getClient engineType rdsClient =
     AuroraClient({
         RdsDataServiceClient = rdsClient
         SecretArn = MyData.secretArn
-        AuroraServerArn = MyData.serverArn
+        AuroraArn = MyData.serverArn
         DatabaseName = MyData.databaseName
+        EngineType = engineType
     })
     
 [<CLIMutable>]
-type TestRecord = {
+type TestPostgreSqlRecord = {
     SerialField: int
     TimeStampField: DateTime
     TextField: string
@@ -24,10 +26,29 @@ type TestRecord = {
     SmallintField: int16
     IntegerField: int32
     BigintField: int64
-    NumericField: decimal
     DecimalField: decimal
     DoubleField: float
     RealField: single
+    BinaryField: MemoryStream
+    NullIntField: Nullable<int>
+}
+
+[<CLIMutable>]
+type TestMySqlRecord = {
+    SerialField: uint64
+    TimeStampField: DateTime
+    DateTimeField: DateTime
+    TextField: string
+    VarCharField: string
+    BooleanField: bool
+    TinyintField: int8
+    SmallintField: int16
+    IntegerField: int32
+    BigintField: int64
+    DecimalField: decimal
+    DoubleField: float
+    FloatField: single
+    BinaryField: MemoryStream
     NullIntField: Nullable<int>
 }
 
@@ -45,10 +66,10 @@ let ``Full postgresql test`` () =
             "SmallintField",
             "IntegerField",
             "BigintField",
-            "NumericField",
             "DecimalField",
             "RealField",
             "DoubleField",
+            "BinaryField",
             "NullIntField"
         )
         VALUES (
@@ -60,10 +81,10 @@ let ``Full postgresql test`` () =
             :smallintField,
             :integerField,
             :bigintField,
-            :numericField,
             :decimalField,
             :realField,
             :doubleField,
+            :binaryField,
             :nullIntField
         )
         RETURNING "SerialField"
@@ -78,10 +99,10 @@ let ``Full postgresql test`` () =
             .Add("smallintField", Int16.MaxValue)
             .Add("integerField", Int32.MaxValue)
             .Add("bigintField", Int64.MaxValue)
-            .Add("numericField", 100.000001m)
             .Add("decimalField", 100.000001m)
             .Add("realField", 100.00f)
             .Add("doubleField", 100.00)
+            .Add("binaryField", new MemoryStream([| 0uy; 1uy; 2uy |]))
             .Add("nullIntField", 123)
     let selectSql =
         """
@@ -95,12 +116,92 @@ let ``Full postgresql test`` () =
                 MyData.iamSecretKey,
                 MyData.region
             )
-        let client = getClient rdsClient
+        let client = getClient EngineType.PostgreSql rdsClient
         let! newId = client.ExecuteScalar<int>(sql, parameters)
         let selectParameters =
             SqlParameters()
                 .Add("serialField", newId)
-        let! newRecord = client.QueryFirst<TestRecord>(selectSql, selectParameters)
+        let! newRecord = client.QueryFirst<TestPostgreSqlRecord>(selectSql, selectParameters)
+        match newRecord with
+        | ValueSome r ->
+            ()
+        | ValueNone ->
+            failwith "Record should not be null"
+                    
+    }
+    
+[<Fact>]
+let ``Full mysql test`` () =
+
+    let sql =
+        """
+        INSERT INTO test (
+            `TimeStampField`,
+            `DateTimeField`,
+            `TextField`,
+            `VarCharField`,
+            `BooleanField`,
+            `TinyintField`,
+            `SmallintField`,
+            `IntegerField`,
+            `BigintField`,
+            `DecimalField`,
+            `FloatField`,
+            `DoubleField`,
+            `BinaryField`,
+            `NullIntField`
+        )
+        VALUES (
+            :timeStampField,
+            :dateTimeField,
+            :textField,
+            :varCharField,
+            :booleanField,
+            :tinyintField,
+            :smallintField,
+            :integerField,
+            :bigintField,
+            :decimalField,
+            :floatField,
+            :doubleField,
+            :binaryField,
+            :nullIntField
+        );
+        """
+    let parameters =
+        SqlParameters()
+            .Add("timeStampField", DateTime.UtcNow)
+            .Add("dateTimeField", DateTime.UtcNow)
+            .Add("textField", "mytext")
+            .Add("varCharField", "myvarchar")
+            .Add("booleanField", true)
+            .Add("tinyintField", SByte.MaxValue)
+            .Add("smallintField", Int16.MaxValue)
+            .Add("integerField", Int32.MaxValue)
+            .Add("bigintField", Int64.MaxValue)
+            .Add("decimalField", 100.000001m)
+            .Add("floatField", 100.00f)
+            .Add("doubleField", 100.00)
+            .Add("binaryField", new MemoryStream([| 0uy; 1uy; 2uy |]))
+            .Add("nullIntField", 123)
+    let selectSql =
+        """
+        SELECT * FROM test
+        WHERE `SerialField` = :serialField 
+        """
+    task {
+        use rdsClient =
+            new AmazonRDSDataServiceClient(
+                MyData.iamAccessKey,
+                MyData.iamSecretKey,
+                MyData.region
+            )
+        let client = getClient EngineType.MySql rdsClient
+        let! newId = client.ExecuteScalar<int64>(sql, parameters)
+        let selectParameters =
+            SqlParameters()
+                .Add("serialField", newId)
+        let! newRecord = client.QueryFirst<TestMySqlRecord>(selectSql, selectParameters)
         match newRecord with
         | ValueSome r ->
             ()

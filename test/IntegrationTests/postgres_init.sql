@@ -9,10 +9,10 @@ CREATE TABLE test
     "SmallintField"  smallint         NOT NULL,
     "IntegerField"   integer          NOT NULL,
     "BigintField"    bigint           NOT NULL,
-    "NumericField"   numeric          NOT NULL,
     "DecimalField"   decimal          NOT NULL,
     "DoubleField"    double precision NOT NULL,
     "RealField"      real             NOT NULL,
+    "BinaryField"    bytea            NOT NULL,
     "NullIntField"   int              NULL
 )
     
