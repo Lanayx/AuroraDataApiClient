@@ -63,7 +63,7 @@ type SqlParameters() =
     member this.Add(name: string, value: DateTime) =
         SqlParameter(
             Name = name,
-            Value = Field(StringValue = value.ToString("yyyy-MM-dd hh:mm:ss.fff")),
+            Value = Field(StringValue = value.ToString("yyyy-MM-dd hh:mm:ss.fff", CultureInfo.InvariantCulture)),
             TypeHint = TypeHint.TIMESTAMP
         ) |> allParameters.Add
         this
@@ -87,11 +87,17 @@ type SqlParameters() =
             Value = Field(BlobValue = value)
         ) |> allParameters.Add
         this
-    member this.AddJson<'T>(name: string, value: 'T) =
+    member this.AddJson(name: string, value: 'T) =
         SqlParameter(
             Name = name,
-            Value = Field(StringValue = JsonSerializer.Serialize(value)),
+            Value = Field(StringValue = JsonSerializer.Serialize value),
             TypeHint = TypeHint.JSON
+        ) |> allParameters.Add
+        this
+    member this.AddNull(name: string) =
+        SqlParameter(
+            Name = name,
+            Value = Field(IsNull = true)
         ) |> allParameters.Add
         this
 
@@ -162,9 +168,17 @@ module internal TransformHelpers =
         | "float8" ->
             field.DoubleValue |> box |> Ok
         | "timestamp" ->
-            field.StringValue |> DateTime.Parse |> box |> Ok
+            DateTime.Parse(field.StringValue, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal) |> box |> Ok
         | "bytea" ->
             field.BlobValue |> box |> Ok
+        | "_text" | "_varchar" ->
+            field.ArrayValue.StringValues |> box |> Ok
+        | "_bigserial" | "_int8" ->
+            field.ArrayValue.LongValues |> box |> Ok
+        | "_bool" ->
+            field.ArrayValue.BooleanValues |> box |> Ok
+        | "_float8" ->
+            field.ArrayValue.DoubleValues |> box |> Ok
         | _ ->
             Error <| $"Unknown type {col.TypeName} for {col.Name}"
         
@@ -191,7 +205,7 @@ module internal TransformHelpers =
         | "DOUBLE" ->
             field.DoubleValue |> box |> Ok
         | "TIMESTAMP" | "DATETIME" ->
-            field.StringValue |> DateTime.Parse |> box |> Ok
+            DateTime.Parse(field.StringValue, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal) |> box |> Ok
         | "BLOB" ->
             field.BlobValue |> box |> Ok
         | _ ->
@@ -210,11 +224,14 @@ module internal TransformHelpers =
         let errors = ResizeArray()
         for col, field in data do
             let property = t.GetProperty col.Name
-            match getValue engineType col field with
-            | Ok value ->
-                property.SetValue(o, value)
-            | Error err ->
-                errors.Add err
+            if field.IsNull then
+                property.SetValue(o, null)
+            else
+                match getValue engineType col field with
+                | Ok value ->
+                    property.SetValue(o, value)
+                | Error err ->
+                    errors.Add err
         if errors.Count > 0 then
             failwith <| String.Join(Environment.NewLine, errors)
         o

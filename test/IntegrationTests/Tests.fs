@@ -31,6 +31,7 @@ type TestPostgreSqlRecord = {
     RealField: single
     BinaryField: MemoryStream
     NullIntField: Nullable<int>
+    StringArrayField: ResizeArray<string>
 }
 
 [<CLIMutable>]
@@ -70,7 +71,8 @@ let ``Full postgresql test`` () =
             "RealField",
             "DoubleField",
             "BinaryField",
-            "NullIntField"
+            "NullIntField",
+            "StringArrayField"
         )
         VALUES (
             :timeStampField,
@@ -85,7 +87,8 @@ let ``Full postgresql test`` () =
             :realField,
             :doubleField,
             :binaryField,
-            :nullIntField
+            :nullIntField,
+            '{"one", "two", "three"}'
         )
         RETURNING "SerialField"
         """
@@ -103,7 +106,7 @@ let ``Full postgresql test`` () =
             .Add("realField", 100.00f)
             .Add("doubleField", 100.00)
             .Add("binaryField", new MemoryStream([| 0uy; 1uy; 2uy |]))
-            .Add("nullIntField", 123)
+            .AddNull("nullIntField")
     let selectSql =
         """
         SELECT * FROM test
@@ -183,7 +186,7 @@ let ``Full mysql test`` () =
             .Add("floatField", 100.00f)
             .Add("doubleField", 100.00)
             .Add("binaryField", new MemoryStream([| 0uy; 1uy; 2uy |]))
-            .Add("nullIntField", 123)
+            .AddNull("nullIntField")
     let selectSql =
         """
         SELECT * FROM test
