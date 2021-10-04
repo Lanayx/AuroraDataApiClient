@@ -6,8 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="AuroraClient.fs" />
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Settings.fs" />
+    <Compile Include="SqlParameters.fs" />
+    <Compile Include="Transformers.fs" />
+    <Compile Include="AuroraClient.fs" />
   </ItemGroup>
 
   <ItemGroup>

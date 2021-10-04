@@ -15,6 +15,7 @@ CREATE TABLE test
     `FloatField`     float            NOT NULL,
     `BinaryField`    blob             NOT NULL,
     `NullIntField`   int              NULL,
+    `JsonField`      json             NOT NULL,
      PRIMARY KEY(`SerialField`)
 )
     

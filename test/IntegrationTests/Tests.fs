@@ -14,7 +14,11 @@ let getClient engineType rdsClient =
         DatabaseName = MyData.databaseName
         EngineType = engineType
     })
-    
+[<CLIMutable>]
+type Person = {
+    Id: int
+    Name: string
+}
 [<CLIMutable>]
 type TestPostgreSqlRecord = {
     SerialField: int
@@ -32,6 +36,8 @@ type TestPostgreSqlRecord = {
     BinaryField: MemoryStream
     NullIntField: Nullable<int>
     StringArrayField: ResizeArray<string>
+    JsonField: Person
+    JsonbField: Person
 }
 
 [<CLIMutable>]
@@ -51,6 +57,7 @@ type TestMySqlRecord = {
     FloatField: single
     BinaryField: MemoryStream
     NullIntField: Nullable<int>
+    JsonField: Person
 }
 
 [<Fact>]
@@ -72,7 +79,9 @@ let ``Full postgresql test`` () =
             "DoubleField",
             "BinaryField",
             "NullIntField",
-            "StringArrayField"
+            "StringArrayField",
+            "JsonField",
+            "JsonbField"
         )
         VALUES (
             :timeStampField,
@@ -88,7 +97,9 @@ let ``Full postgresql test`` () =
             :doubleField,
             :binaryField,
             :nullIntField,
-            '{"one", "two", "three"}'
+            '{"one", "two", "three"}',
+            :jsonField,
+            :jsonbField
         )
         RETURNING "SerialField"
         """
@@ -107,6 +118,8 @@ let ``Full postgresql test`` () =
             .Add("doubleField", 100.00)
             .Add("binaryField", new MemoryStream([| 0uy; 1uy; 2uy |]))
             .AddNull("nullIntField")
+            .AddJson("jsonField", { Id = 1; Name = "James" })
+            .AddJson("jsonbField", { Id = 2; Name = "John" })
     let selectSql =
         """
         SELECT * FROM test
@@ -152,7 +165,8 @@ let ``Full mysql test`` () =
             `FloatField`,
             `DoubleField`,
             `BinaryField`,
-            `NullIntField`
+            `NullIntField`,
+            `JsonField`
         )
         VALUES (
             :timeStampField,
@@ -168,7 +182,8 @@ let ``Full mysql test`` () =
             :floatField,
             :doubleField,
             :binaryField,
-            :nullIntField
+            :nullIntField,
+            :jsonField
         );
         """
     let parameters =
@@ -187,6 +202,7 @@ let ``Full mysql test`` () =
             .Add("doubleField", 100.00)
             .Add("binaryField", new MemoryStream([| 0uy; 1uy; 2uy |]))
             .AddNull("nullIntField")
+            .AddJson("jsonField", { Id = 1; Name = "James" })
     let selectSql =
         """
         SELECT * FROM test

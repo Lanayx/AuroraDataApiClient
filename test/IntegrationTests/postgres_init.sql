@@ -14,6 +14,7 @@ CREATE TABLE test
     "RealField"        real             NOT NULL,
     "BinaryField"      bytea            NOT NULL,
     "NullIntField"     int              NULL,
-    "StringArrayField" text[]           NOT NULL
+    "StringArrayField" text[]           NOT NULL,
+    "JsonField"        json             NOT NULL,
+    "JsonbField"       jsonb            NOT NULL
 )
-    
