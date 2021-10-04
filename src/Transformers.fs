@@ -49,7 +49,7 @@ module internal Transformers =
         | "float8" ->
             field.DoubleValue |> box |> Ok
         | "timestamp" ->
-            DateTime.Parse(field.StringValue, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal) |> box |> Ok
+            DateTime.Parse(field.StringValue, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal) |> box |> Ok
         | "bytea" ->
             field.BlobValue |> box |> Ok
         | "json" | "jsonb" ->
@@ -88,7 +88,7 @@ module internal Transformers =
         | "DOUBLE" ->
             field.DoubleValue |> box |> Ok
         | "TIMESTAMP" | "DATETIME" ->
-            DateTime.Parse(field.StringValue, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal) |> box |> Ok
+            DateTime.Parse(field.StringValue, CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal) |> box |> Ok
         | "BLOB" ->
             field.BlobValue |> box |> Ok
         | "JSON" ->

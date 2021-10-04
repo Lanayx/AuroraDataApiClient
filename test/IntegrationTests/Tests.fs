@@ -103,13 +103,15 @@ let ``Full postgresql test`` () =
         )
         RETURNING "SerialField"
         """
+    let dt = DateTime.UtcNow
+    let guid = Guid.NewGuid()
     let parameters =
         SqlParameters()
-            .Add("timeStampField", DateTime.UtcNow)
+            .Add("timeStampField", dt)
             .Add("textField", "mytext")
             .Add("varCharField", "myvarchar")
             .Add("booleanField", true)
-            .Add("uuidField", Guid.NewGuid())
+            .Add("uuidField", guid)
             .Add("smallintField", Int16.MaxValue)
             .Add("integerField", Int32.MaxValue)
             .Add("bigintField", Int64.MaxValue)
@@ -140,7 +142,23 @@ let ``Full postgresql test`` () =
         let! newRecord = client.QueryFirst<TestPostgreSqlRecord>(selectSql, selectParameters)
         match newRecord with
         | ValueSome r ->
-            ()
+            Assert.Equal(newId, r.SerialField)
+            Assert.True((dt - r.TimeStampField).TotalMilliseconds < 1.0)
+            Assert.Equal("mytext", r.TextField)
+            Assert.Equal("myvarchar", r.VarCharField)
+            Assert.Equal(true, r.BooleanField)
+            Assert.Equal(guid, r.UuidField)
+            Assert.Equal(Int16.MaxValue, r.SmallintField)
+            Assert.Equal(Int32.MaxValue, r.IntegerField)
+            Assert.Equal(Int64.MaxValue, r.BigintField)
+            Assert.Equal(100.000001m, r.DecimalField)
+            Assert.Equal(100.00, r.DoubleField)
+            Assert.Equal(100.00f, r.RealField)
+            Assert.Equal<byte>(seq { 0uy; 1uy; 2uy }, r.BinaryField.ToArray())
+            Assert.Null(r.NullIntField)
+            Assert.Equal<string>(seq{"one"; "two"; "three"}, r.StringArrayField)
+            Assert.Equal({ Id = 1; Name = "James" }, r.JsonField)
+            Assert.Equal({ Id = 2; Name = "John" }, r.JsonbField)
         | ValueNone ->
             failwith "Record should not be null"
                     
@@ -186,10 +204,11 @@ let ``Full mysql test`` () =
             :jsonField
         );
         """
+    let dt = DateTime.UtcNow
     let parameters =
         SqlParameters()
-            .Add("timeStampField", DateTime.UtcNow)
-            .Add("dateTimeField", DateTime.UtcNow)
+            .Add("timeStampField", dt)
+            .Add("dateTimeField", dt)
             .Add("textField", "mytext")
             .Add("varCharField", "myvarchar")
             .Add("booleanField", true)
@@ -222,8 +241,23 @@ let ``Full mysql test`` () =
                 .Add("serialField", newId)
         let! newRecord = client.QueryFirst<TestMySqlRecord>(selectSql, selectParameters)
         match newRecord with
-        | ValueSome r ->
-            ()
+        | ValueSome r -> 
+            Assert.Equal(newId, int64 r.SerialField)
+            Assert.True((dt - r.TimeStampField).TotalMilliseconds < 1.0)
+            Assert.True((dt - r.DateTimeField).TotalMilliseconds < 1.0)
+            Assert.Equal("mytext", r.TextField)
+            Assert.Equal("myvarchar", r.VarCharField)
+            Assert.Equal(true, r.BooleanField)
+            Assert.Equal(SByte.MaxValue, r.TinyintField)
+            Assert.Equal(Int16.MaxValue, r.SmallintField)
+            Assert.Equal(Int32.MaxValue, r.IntegerField)
+            Assert.Equal(Int64.MaxValue, r.BigintField)
+            Assert.Equal(100.000001m, r.DecimalField)
+            Assert.Equal(100.00, r.DoubleField)
+            Assert.Equal(100.00f, r.FloatField)
+            Assert.Equal<byte>(seq { 0uy; 1uy; 2uy }, r.BinaryField.ToArray())
+            Assert.Null(r.NullIntField)
+            Assert.Equal({ Id = 1; Name = "James" }, r.JsonField)
         | ValueNone ->
             failwith "Record should not be null"
                     

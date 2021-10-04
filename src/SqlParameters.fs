@@ -61,7 +61,7 @@ type SqlParameters() =
     member this.Add(name: string, value: DateTime) =
         SqlParameter(
             Name = name,
-            Value = Field(StringValue = value.ToString("yyyy-MM-dd hh:mm:ss.fff", CultureInfo.InvariantCulture)),
+            Value = Field(StringValue = value.ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture)),
             TypeHint = TypeHint.TIMESTAMP
         ) |> allParameters.Add
         this
