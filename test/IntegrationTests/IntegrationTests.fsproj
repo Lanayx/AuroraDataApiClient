@@ -2,15 +2,12 @@
 
     <PropertyGroup>
         <TargetFramework>net5.0</TargetFramework>
-
         <IsPackable>false</IsPackable>
-        <GenerateProgramFile>false</GenerateProgramFile>
     </PropertyGroup>
 
     <ItemGroup>
         <Compile Include="MyData.fs" />
         <Compile Include="Tests.fs" />
-        <Compile Include="Program.fs" />
         <Content Include="mysql_init.sql" />
         <Content Include="postgres_init.sql" />
     </ItemGroup>
