@@ -100,14 +100,15 @@ module internal Transformers =
         match engineType with
         | EngineType.PostgreSql -> getPostgreSqlValue valueType col field
         | EngineType.MySql -> getMySqlValue valueType col field
-        | _ -> failwith "Unknown engine type"        
+        | _ -> failwith "Unknown engine type"
         
-    let parse engineType (data: (ColumnMetadata*Field) seq): 'T =
-        let t = typeof<'T>
+    let parse engineType (recordType: Type) (record: ResizeArray<Field>) (columnMetadata: ResizeArray<ColumnMetadata>): 'T =
         let o = Activator.CreateInstance<'T>()
-        let errors = ResizeArray()
-        for col, field in data do
-            let property = t.GetProperty col.Name
+        let mutable errors: ResizeArray<string> = null
+        for i in 0..record.Count-1 do
+            let field = record.[i]
+            let col = columnMetadata.[i]
+            let property = recordType.GetProperty col.Name
             if field.IsNull then
                 property.SetValue(o, null)
             else
@@ -115,20 +116,21 @@ module internal Transformers =
                 | Ok value ->
                     property.SetValue(o, value)
                 | Error err ->
+                    if errors |> isNull then
+                        errors <- ResizeArray()
                     errors.Add err
-        if errors.Count > 0 then
+        if errors |> isNull |> not then
             failwith <| String.Join(Environment.NewLine, errors)
         o
         
-    let transformRecords engineType (data: ExecuteStatementResponse) =
-        data.Records
-        |> Seq.map (fun record ->
-            record
-            |> Seq.zip data.ColumnMetadata
-            |> parse engineType
-        )
+    let transformRecords engineType (data: ExecuteStatementResponse): 'T seq =
+        let t = typeof<'T>
+        seq {
+            for record in data.Records do
+                yield parse engineType t record data.ColumnMetadata
+        }
         
-    let parseScalarData<'T> engineType (data: ExecuteStatementResponse) =
+    let parseScalarData engineType (data: ExecuteStatementResponse) =
         match engineType with
         | EngineType.PostgreSql ->
             let field =
