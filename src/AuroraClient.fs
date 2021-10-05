@@ -14,7 +14,7 @@ type AuroraClient (settings: AuroraClientSettings) =
             return data.NumberOfRecordsUpdated
         }
         
-    /// Executes the query, and returns the first column of the first row in the result set
+    /// Executes the query and returns the first column of the first row in the result set
     member this.ExecuteScalar<'T> (sqlCommand, sqlParameters): Task<'T> =
         let request = createExecuteRequest settings sqlCommand sqlParameters true
         task {
@@ -22,6 +22,7 @@ type AuroraClient (settings: AuroraClientSettings) =
             return parseScalarData settings.EngineType data
         }        
     
+    /// Executes the query and returns records
     member this.Query(sqlCommand, sqlParameters) =
         let request = createExecuteRequest settings sqlCommand sqlParameters true
         task {
@@ -33,6 +34,7 @@ type AuroraClient (settings: AuroraClientSettings) =
                     transformRecords settings.EngineType data
         }
         
+    /// Executes the query and returns first record, wrapped in Option
     member this.QueryFirst(sqlCommand, sqlParameters) =
         let request = createExecuteRequest settings sqlCommand sqlParameters true
         task {
@@ -44,6 +46,7 @@ type AuroraClient (settings: AuroraClientSettings) =
                     transformRecords settings.EngineType data |> Seq.head |> ValueSome
         }
         
+    /// Begins a transaction
     member this.BeginTransaction () =
         let request =
             BeginTransactionRequest (
@@ -56,6 +59,7 @@ type AuroraClient (settings: AuroraClientSettings) =
             return response.TransactionId
         }
         
+    /// Commits a transaction
     member this.CommitTransaction transactionId =
         let request =
             CommitTransactionRequest (
@@ -68,6 +72,7 @@ type AuroraClient (settings: AuroraClientSettings) =
             return response.TransactionStatus
         }
             
+    // Rolls back a transaction
     member this.RollbackTransaction transactionId =
         let request =
             RollbackTransactionRequest (
