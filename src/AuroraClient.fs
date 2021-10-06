@@ -1,30 +1,37 @@
 ﻿namespace AuroraDataApiClient
 
-open System.Threading.Tasks
 open Amazon.RDSDataService.Model
+open System.Threading.Tasks
+open System.Runtime.InteropServices
 
 type AuroraClient (settings: AuroraClientSettings) =
     do settings.Validate()
         
     /// Executes query and returns number of records updated
-    member this.Execute (sqlCommand, sqlParameters) =
-        let request = createExecuteRequest settings sqlCommand sqlParameters false
+    member this.Execute (sqlCommand,
+                         [<OptionalArgument;DefaultParameterValue(null)>] sqlParameters: SqlParameters,
+                         [<OptionalArgument;DefaultParameterValue(null)>] transactionId: string) =
+        let request = createExecuteRequest settings sqlCommand sqlParameters false transactionId
         task {
             let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
             return data.NumberOfRecordsUpdated
         }
         
     /// Executes the query and returns the first column of the first row in the result set
-    member this.ExecuteScalar<'T> (sqlCommand, sqlParameters): Task<'T> =
-        let request = createExecuteRequest settings sqlCommand sqlParameters true
+    member this.ExecuteScalar<'T> (sqlCommand,
+                                   [<OptionalArgument;DefaultParameterValue(null)>] sqlParameters: SqlParameters,
+                                   [<OptionalArgument;DefaultParameterValue(null)>] transactionId: string): Task<'T> =
+        let request = createExecuteRequest settings sqlCommand sqlParameters true transactionId
         task {
             let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
             return parseScalarData settings.EngineType data
         }        
     
     /// Executes the query and returns records
-    member this.Query(sqlCommand, sqlParameters) =
-        let request = createExecuteRequest settings sqlCommand sqlParameters true
+    member this.Query(sqlCommand,
+                      [<OptionalArgument;DefaultParameterValue(null)>] sqlParameters: SqlParameters,
+                      [<OptionalArgument;DefaultParameterValue(null)>] transactionId: string) =
+        let request = createExecuteRequest settings sqlCommand sqlParameters true transactionId
         task {
             let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
             return
@@ -35,8 +42,10 @@ type AuroraClient (settings: AuroraClientSettings) =
         }
         
     /// Executes the query and returns first record, wrapped in Option
-    member this.QueryFirst(sqlCommand, sqlParameters) =
-        let request = createExecuteRequest settings sqlCommand sqlParameters true
+    member this.QueryFirst(sqlCommand,
+                           [<OptionalArgument;DefaultParameterValue(null)>] sqlParameters: SqlParameters,
+                           [<OptionalArgument;DefaultParameterValue(null)>] transactionId: string) =
+        let request = createExecuteRequest settings sqlCommand sqlParameters true transactionId
         task {
             let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
             return

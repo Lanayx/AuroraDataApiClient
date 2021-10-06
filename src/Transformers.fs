@@ -13,7 +13,7 @@ module internal Transformers =
     let isSetLong = lazy typeof<Field>.GetMethod("IsSetLongValue", BindingFlags.Instance ||| BindingFlags.NonPublic)
     let isSetDouble = lazy typeof<Field>.GetMethod("IsSetDoubleValue", BindingFlags.Instance ||| BindingFlags.NonPublic)
     
-    let createExecuteRequest (settings: AuroraClientSettings) sqlCommand (parameters: SqlParameters) returnsData =
+    let createExecuteRequest (settings: AuroraClientSettings) sqlCommand (parameters: SqlParameters) returnsData transactionId =
         let request =
             ExecuteStatementRequest(
                 SecretArn = settings.SecretArn,
@@ -26,6 +26,8 @@ module internal Transformers =
         if parameters |> isNull |> not then
             parameters.Value
             |> request.Parameters.AddRange
+        if transactionId |> isNull |> not then
+            request.TransactionId <- transactionId
         request
         
     let getPostgreSqlValue (valueType: Type) (col: ColumnMetadata) (field: Field) =

@@ -135,11 +135,13 @@ let ``Full postgresql test`` () =
                 MyData.region
             )
         let client = getClient EngineType.PostgreSql rdsClient
-        let! newId = client.ExecuteScalar<int>(sql, parameters)
+        let! transactionId = client.BeginTransaction()
+        let! newId = client.ExecuteScalar<int>(sql, parameters, transactionId)
         let selectParameters =
             SqlParameters()
                 .Add("serialField", newId)
-        let! newRecord = client.QueryFirst<TestPostgreSqlRecord>(selectSql, selectParameters)
+        let! newRecord = client.QueryFirst<TestPostgreSqlRecord>(selectSql, selectParameters, transactionId)
+        let! trStatus = client.CommitTransaction(transactionId)
         match newRecord with
         | ValueSome r ->
             Assert.Equal(newId, r.SerialField)
