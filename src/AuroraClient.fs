@@ -9,8 +9,8 @@ type AuroraClient (settings: AuroraClientSettings) =
         
     /// Executes query and returns number of records updated
     member this.Execute (sqlCommand,
-                         [<OptionalArgument;DefaultParameterValue(null)>] sqlParameters: SqlParameters,
-                         [<OptionalArgument;DefaultParameterValue(null)>] transactionId: string) =
+                         [<Optional;DefaultParameterValue(null:SqlParameters)>] sqlParameters,
+                         [<Optional;DefaultParameterValue(null:string)>] transactionId) =
         let request = createExecuteRequest settings sqlCommand sqlParameters false transactionId
         task {
             let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
@@ -19,8 +19,8 @@ type AuroraClient (settings: AuroraClientSettings) =
         
     /// Executes the query and returns the first column of the first row in the result set
     member this.ExecuteScalar<'T> (sqlCommand,
-                                   [<OptionalArgument;DefaultParameterValue(null)>] sqlParameters: SqlParameters,
-                                   [<OptionalArgument;DefaultParameterValue(null)>] transactionId: string): Task<'T> =
+                                   [<Optional;DefaultParameterValue(null:SqlParameters)>] sqlParameters,
+                                   [<Optional;DefaultParameterValue(null:string)>] transactionId): Task<'T> =
         let request = createExecuteRequest settings sqlCommand sqlParameters true transactionId
         task {
             let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
@@ -29,8 +29,8 @@ type AuroraClient (settings: AuroraClientSettings) =
     
     /// Executes the query and returns records
     member this.Query(sqlCommand,
-                      [<OptionalArgument;DefaultParameterValue(null)>] sqlParameters: SqlParameters,
-                      [<OptionalArgument;DefaultParameterValue(null)>] transactionId: string) =
+                      [<Optional;DefaultParameterValue(null:SqlParameters)>] sqlParameters,
+                      [<Optional;DefaultParameterValue(null:string)>] transactionId) =
         let request = createExecuteRequest settings sqlCommand sqlParameters true transactionId
         task {
             let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request
@@ -43,8 +43,8 @@ type AuroraClient (settings: AuroraClientSettings) =
         
     /// Executes the query and returns first record, wrapped in Option
     member this.QueryFirst(sqlCommand,
-                           [<OptionalArgument;DefaultParameterValue(null)>] sqlParameters: SqlParameters,
-                           [<OptionalArgument;DefaultParameterValue(null)>] transactionId: string) =
+                           [<Optional;DefaultParameterValue(null:SqlParameters)>] sqlParameters,
+                           [<Optional;DefaultParameterValue(null:string)>] transactionId) =
         let request = createExecuteRequest settings sqlCommand sqlParameters true transactionId
         task {
             let! data = settings.RdsDataServiceClient.ExecuteStatementAsync request

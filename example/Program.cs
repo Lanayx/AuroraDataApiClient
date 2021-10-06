@@ -10,10 +10,10 @@ var client = new AuroraClient(new AuroraClientSettings(rdsClient,
 
 var id = await client.ExecuteScalar<int>(
     "INSERT INTO person (\"Name\") VALUES (:name) RETURNING \"Id\"",
-    new SqlParameters().Add("name", "Jim"), null);
+    new SqlParameters().Add("name", "Jim"));
 var person = await client.QueryFirst<Person>(
     "SELECT \"Id\", \"Name\" FROM person WHERE \"Id\"= :id",
-    new SqlParameters().Add("id", id), null);
+    new SqlParameters().Add("id", id));
 var result =
     person switch
     {
