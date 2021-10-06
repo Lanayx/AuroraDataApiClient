@@ -1,6 +1,8 @@
 # DataApi client for Aurora Serverless
 *AWS.RDSDataService* wrapper for .NET
 
+[Nuget AuroraDataApiClient](https://www.nuget.org/packages/AuroraDataApiClient)
+
 Allows queries like
 ```c#
 var person = await client.QueryFirst<Person>(
