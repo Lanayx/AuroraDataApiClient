@@ -111,16 +111,17 @@ module internal Transformers =
             let field = record.[i]
             let col = columnMetadata.[i]
             let property = recordType.GetProperty col.Name
-            if field.IsNull then
-                property.SetValue(o, null)
-            else
-                match getValue engineType property.PropertyType col field with
-                | Ok value ->
-                    property.SetValue(o, value)
-                | Error err ->
-                    if errors |> isNull then
-                        errors <- ResizeArray()
-                    errors.Add err
+            if property |> isNull |> not then
+                if field.IsNull then
+                    property.SetValue(o, null)
+                else
+                    match getValue engineType property.PropertyType col field with
+                    | Ok value ->
+                        property.SetValue(o, value)
+                    | Error err ->
+                        if errors |> isNull then
+                            errors <- ResizeArray()
+                        errors.Add err
         if errors |> isNull |> not then
             failwith <| String.Join(Environment.NewLine, errors)
         o

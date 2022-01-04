@@ -98,6 +98,38 @@ type SqlParameters() =
             Value = Field(IsNull = true)
         ) |> allParameters.Add
         this
+    member this.Add(name: string, value: string seq) =
+        let arrayValue = ArrayValue()
+        arrayValue.StringValues.AddRange(value)
+        SqlParameter(
+            Name = name,
+            Value = Field(ArrayValue = arrayValue)
+        ) |> allParameters.Add
+        this
+    member this.Add(name: string, value: bool seq) =
+        let arrayValue = ArrayValue()
+        arrayValue.BooleanValues.AddRange(value)
+        SqlParameter(
+            Name = name,
+            Value = Field(ArrayValue = arrayValue)
+        ) |> allParameters.Add
+        this
+    member this.Add(name: string, value: float seq) =
+        let arrayValue = ArrayValue()
+        arrayValue.DoubleValues.AddRange(value)
+        SqlParameter(
+            Name = name,
+            Value = Field(ArrayValue = arrayValue)
+        ) |> allParameters.Add
+        this
+    member this.Add(name: string, value: int64 seq) =
+        let arrayValue = ArrayValue()
+        arrayValue.LongValues.AddRange(value)
+        SqlParameter(
+            Name = name,
+            Value = Field(ArrayValue = arrayValue)
+        ) |> allParameters.Add
+        this
 
     member this.Value = allParameters
 
