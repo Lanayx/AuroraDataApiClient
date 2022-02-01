@@ -4,8 +4,8 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>AuroraDataApiClient</PackageId>
-    <Version>0.1.0</Version>
-    <PackageVersion>0.1.0</PackageVersion>
+    <Version>0.1.1</Version>
+    <PackageVersion>0.1.1</PackageVersion>
     <Title>AuroraDataApiClient</Title>
     <RootNamespace>AuroraDataApiClient</RootNamespace>
     <Authors>Vladimir Shchur</Authors>
@@ -14,7 +14,7 @@
     <RepositoryUrl>https://github.com/Lanayx/AuroraDataApiClient</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <DebugType>portable</DebugType>
-    <PackageReleaseNotes>First release</PackageReleaseNotes>
+    <PackageReleaseNotes>Fix for non-existing property</PackageReleaseNotes>
     <!-- Source Link props -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
